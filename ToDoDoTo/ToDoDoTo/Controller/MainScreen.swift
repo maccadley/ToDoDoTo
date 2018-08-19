@@ -9,21 +9,25 @@
 import UIKit
 
 class MainScreen: UITableViewController {
-    
-    var itemArray = ["Find me", "Buy balls", "Destroy Moscow"]
-    var defaults = UserDefaults.standard
+    //Singleton of Item class.
+    var itemArray = [Items]()
+    //URL to Docements directory, and creating new file which will contains new Arrays of objects
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        if let items = defaults.array(forKey: "ToDoListArray") as? [String]{
-            itemArray = items
-        }
+        loadItems()
+        
     }
 
     //Mark: - TableView DataSorceMethods
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        cell.textLabel?.text = itemArray[indexPath.row]
+        let item = itemArray[indexPath.row]
+        cell.textLabel?.text = item.itemName
+        //Check if Item has doneOrNot boolean and marks it with checkmark
+        cell.accessoryType = item.doneOrNot ? .checkmark : .none
+        
         return cell
         
     }
@@ -33,25 +37,23 @@ class MainScreen: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        //print(itemArray[indexPath.row])
-        
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark{
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        } else{
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
-        
+        // Switching BOOlean in Items and imediatly reloads the tableView
+        itemArray[indexPath.row].doneOrNot = !itemArray[indexPath.row].doneOrNot
+        saveDataAction()
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
     @IBAction func addNewItems(_ sender: UIBarButtonItem) {
+        //Creating UIAlert action with TextField
         var textField = UITextField()
         let alert = UIAlertController(title: "Add new ToDo!", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             // what will happen once User hits add item
-            self.itemArray.append(textField.text!)
-            self.defaults.set(self.itemArray, forKey: "ToDoListArray")
-            self.tableView.reloadData()
+            let newItem = Items()
+            newItem.itemName = textField.text!
+            self.itemArray.append(newItem)
+            //Saving this Text to nameOfItem in ItemToDo class
+            self.saveDataAction()
         }
         alert.addTextField { (alertTexField) in
             alertTexField.placeholder = "Create new item"
@@ -60,7 +62,29 @@ class MainScreen: UITableViewController {
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
     }
+    //MARK: - Decode and Encode the data.
+    // Need to use Encodable, Decodable or both - Codable protocol in certain class
+    func saveDataAction(){
+        let encoder = PropertyListEncoder()
+        do{
+            let data = try encoder.encode(itemArray)
+            try data.write(to: dataFilePath!)
+        } catch{
+            print("error encondoing: \(error)")
+        }
+        self.tableView.reloadData()
+    }
     
+    func loadItems(){
+        if let data = try? Data(contentsOf: dataFilePath!){
+            let decoder = PropertyListDecoder()
+            do{
+            itemArray = try decoder.decode([Items].self, from: data)
+            } catch {
+                print("Error: \(error)")
+            }
+        }
+    }
     
     
 }
